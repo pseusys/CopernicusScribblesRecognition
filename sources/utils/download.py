@@ -40,16 +40,21 @@ def download_letters(save_dataset: bool = True) -> List[Tuple[str, List[bytes]]]
             photo_file = LETTERS_DIR / f"{letter_index}.txt"
             photo_file.write_text(transcription_data)
 
-        # TODO: add support of two-scan letters
-        photo_image_elem = _get_soup(photo_link).find("img", {"id": "obrazek_uchwyt"})
-        photo_image_link = f"{base_link}{photo_image_elem['src']}"
-        photo_image_data = get(photo_image_link).content
+        photo_data = list()
+        while photo_link is not None:
+            photo_soup = _get_soup(photo_link)
+            photo_image_elem = photo_soup.find("img", id="obrazek_uchwyt")
+            photo_image_link = f"{base_link}{photo_image_elem['src']}"
+            photo_data += [(get(photo_image_link).content, photo_image_link.split(".")[-1])]
+            photo_next = photo_soup.find("a", href=True, text="next")
+            photo_link = f"{base_link}{photo_next['href']}" if photo_next is not None else None
 
         if save_dataset:
-            photo_file = LETTERS_DIR / f"{letter_index}.{photo_image_link.split('.')[-1]}"
-            photo_file.write_bytes(photo_image_data)
+            for idx, (data, ext) in enumerate(photo_data):
+                photo_file = LETTERS_DIR / f"{letter_index}-{idx+1}.{ext}"
+                photo_file.write_bytes(data)
 
-        letters += [(transcription_data, [photo_image_data])]
+        letters += [(transcription_data, photo_data)]
         letter_index += 1
 
     print(f"Loaded {letter_index - 1} letter pages!")
